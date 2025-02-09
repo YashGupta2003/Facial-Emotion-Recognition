@@ -1,0 +1,116 @@
+import os
+import numpy as np
+from tensorflow.keras import layers, models
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Step 1: Data Preparation (Ensure dataset paths exist)
+data_dir = r'C:\Users\ADMIN\Documents\pp\pp'  # Path to dataset
+train_dir = os.path.join(data_dir, 'train')
+test_dir = os.path.join(data_dir, 'test')  # Use 'test' folder as validation data
+
+# Check if the dataset directories exist
+if not os.path.exists(train_dir):
+    raise FileNotFoundError(f"Train directory not found: {train_dir}")
+
+if not os.path.exists(test_dir):
+    raise FileNotFoundError(f"Test directory not found: {test_dir}")
+
+# Data Augmentation for Training
+train_datagen = ImageDataGenerator(
+    rescale=1.0 / 255.0,
+    rotation_range=30,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+# Only Rescaling for Validation/Test Data
+test_datagen = ImageDataGenerator(rescale=1.0 / 255.0)
+
+# Data Generators
+train_data = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(48, 48),
+    batch_size=32,
+    class_mode='categorical'
+)
+
+test_data = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(48, 48),
+    batch_size=32,
+    class_mode='categorical',
+    shuffle=False  # Keep test data order for evaluation
+)
+
+# Step 2: Model Architecture
+model = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(48, 48, 3)),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(128, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),  # Dropout to reduce overfitting
+    layers.Dense(len(train_data.class_indices), activation='softmax')
+])
+
+# Step 3: Compile the Model
+model.compile(
+    optimizer='adam',
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# Step 4: Model Training
+callbacks = [EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)]
+history = model.fit(
+    train_data,
+    epochs=30,
+    validation_data=test_data,  # Use test_data for validation
+    callbacks=callbacks
+)
+
+# Step 5: Model Evaluation
+val_loss, val_acc = model.evaluate(test_data)
+print(f"Validation Loss: {val_loss}")
+print(f"Validation Accuracy: {val_acc}")
+
+# Detailed Evaluation
+y_true = test_data.classes  # True labels
+y_pred = np.argmax(model.predict(test_data), axis=-1)  # Predicted labels
+print(classification_report(y_true, y_pred, target_names=list(test_data.class_indices.keys())))
+print(confusion_matrix(y_true, y_pred))
+
+# Step 6: Save the Model in .keras Format
+model.save('emotion_detection_model.keras')
+print("Model saved as 'emotion_detection_model.keras'.")
+
+# Deployment Code Example (using Flask)
+from flask import Flask, request, jsonify
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
+
+app = Flask(__name__)
+model = load_model('emotion_detection_model.keras')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    file = request.files['image']
+    image = load_img(file, target_size=(48, 48))
+    image = img_to_array(image) / 255.0
+    image = np.expand_dims(image, axis=0)
+    prediction = model.predict(image)
+    class_idx = np.argmax(prediction)
+    class_labels = list(train_data.class_indices.keys())
+    return jsonify({'emotion': class_labels[class_idx], 'confidence': float(np.max(prediction))})
+
+if __name__ == '__main__':
+    app.run(debug=True)
