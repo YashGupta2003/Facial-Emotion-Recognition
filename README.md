@@ -4,7 +4,7 @@
 🧠 Powered by: TensorFlow | OpenCV | Streamlit
 
 🔥 Project Overview
-The Facial Emotion Recognition System is an AI-driven solution that detects and classifies human emotions in real-time video streams with an 89% accuracy rate using the FER 2013 dataset. This project integrates self-learning AI capabilities, continuously improving its predictions over time by dynamically collecting and retraining on new data.
+The Facial Emotion Recognition System is an AI-driven solution that detects and classifies human emotions in real-time video streams with an 99% accuracy rate using the FER 2013 dataset. This project integrates self-learning AI capabilities, continuously improving its predictions over time by dynamically collecting and retraining on new data.
 
 🚀 Key Features:
 ✅ Real-Time Emotion Detection – Live video analysis for instant recognition.
